@@ -1,0 +1,45 @@
+{
+    "name": "betterpr",
+    "version": "1.0.0",
+    "description": "A better way to look at PRs in Bitbucket!",
+    "main": "./bin/cli.js",
+    "bin": {
+        "betterpr": "./bin/cli.js"
+    },
+    "engines": {
+        "node": ">=12.0.0"
+    },
+    "keywords": [
+        "cli",
+        "bitbucket",
+        "pr",
+        "prs",
+        "pullrequest",
+        "pullrequests",
+        "pull request",
+        "pull requests"
+    ],
+    "author": {
+        "name": "Hunter Parks",
+        "email": "hunterparks+betterpr@pm.me"
+    },
+    "license": "ISC",
+    "homepage": "https://github.com/hunterparks/betterpr",
+    "bugs": "https://github.com/hunterparks/betterpr/issues",
+    "scripts": {
+        "build": "tsc",
+        "dev": "npm run build && npm start",
+        "start": "node ./bin/cli.js"
+    },
+    "devDependencies": {
+        "@types/node": "^17.0.25",
+        "@types/prompts": "^2.0.14",
+        "typescript": "^4.6.3"
+    },
+    "dependencies": {
+        "bitbucket": "^2.7.0",
+        "kleur": "^4.1.4",
+        "loading-cli": "^1.1.0",
+        "prompts": "^2.4.2"
+    }
+}
