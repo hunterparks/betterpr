@@ -7,9 +7,9 @@ BetterPR is a better way to look at PRs in Bitbucket!
 Use the package manager [npm](https://npmjs.com/) to install BetterPR.
 
 ```bash
-npm install --global betterpr
+npm install --global @hunterparks/betterpr
 # or, even shorter
-npm i -g betterpr
+npm i -g @hunterparks/betterpr
 ```
 
 ## Usage
