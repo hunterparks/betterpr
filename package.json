@@ -1,5 +1,5 @@
 {
-    "name": "betterpr",
+    "name": "@hunterparks/betterpr",
     "version": "1.0.0",
     "description": "A better way to look at PRs in Bitbucket!",
     "main": "./bin/cli.js",
