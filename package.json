@@ -1,6 +1,6 @@
 {
     "name": "@hunterparks/betterpr",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "description": "A better way to look at PRs in Bitbucket!",
     "main": "./bin/cli.js",
     "bin": {
@@ -40,7 +40,7 @@
         "bitbucket": "^2.7.0",
         "kleur": "^4.1.4",
         "loading-cli": "^1.1.0",
-        "node-fetch": "^3.2.3",
+        "node-fetch": "^2.6.7",
         "prompts": "^2.4.2"
     }
 }

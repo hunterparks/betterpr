@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
-import { Bitbucket } from "bitbucket";
-import crypto from "crypto";
-import fs from "fs";
-import kleur from "kleur";
-import loading from "loading-cli";
-import { Options, Schema } from "bitbucket/lib/bitbucket";
-import fetch from "node-fetch";
-import path from "path";
-import prompts from "prompts";
-import { compareVersions } from "./lib/utils";
+import { Bitbucket } from 'bitbucket';
+import crypto from 'crypto';
+import fs from 'fs';
+import kleur from 'kleur';
+import loading from 'loading-cli';
+import { Options, Schema } from 'bitbucket/lib/bitbucket';
+const fetch = require('node-fetch');
+import path from 'path';
+import prompts from 'prompts';
+import { compareVersions } from './lib/utils';
 
 type BetterPrCache = {
     username?: string;
@@ -21,27 +21,27 @@ type BetterPrCachePassword = {
     iv: string;
     content: string;
 };
-// type RegistryResponse = {
-//     "dist-tags": {
-//         latest: string;
-//     };
-// };
+type RegistryResponse = {
+    'dist-tags': {
+        latest: string;
+    };
+};
 const baseClientOptions: Options = {
-    baseUrl: "https://api.bitbucket.org/2.0",
+    baseUrl: 'https://api.bitbucket.org/2.0',
     notice: false,
 };
-const cacheFileName = "betterpr_cache.json";
+const cacheFileName = 'betterpr_cache.json';
 const cacheFilePath = path.join(__dirname, cacheFileName);
-const algo = "aes-256-ctr";
-const key = "NSCcA4wvkQxTKaJp7fFJsQM7mR8WEghn";
-const NPM_REGISTRY_URL = "https://registry.npmjs.com/";
+const algo = 'aes-256-ctr';
+const key = 'NSCcA4wvkQxTKaJp7fFJsQM7mR8WEghn';
+const NPM_REGISTRY_URL = 'https://registry.npmjs.com/';
 
-const blueCircle = () => kleur.blue("●");
+const blueCircle = () => kleur.blue('●');
 
 const errorMessage = (message: string) =>
-    console.log(`${kleur.red().bold("Error:")} ${message}`);
+    console.log(`${kleur.red().bold('Error:')} ${message}`);
 
-const greenCheck = () => kleur.green("✔");
+const greenCheck = () => kleur.green('✔');
 
 const main = async () => {
     // Get State Configuration
@@ -49,78 +49,90 @@ const main = async () => {
         fs.writeFileSync(cacheFilePath, JSON.stringify({}));
     }
     let betterPrCache: BetterPrCache = JSON.parse(
-        fs.readFileSync(cacheFilePath, { encoding: "utf8" })
+        fs.readFileSync(cacheFilePath, { encoding: 'utf8' })
     );
     // Version and Header
-    const packageJsonPath = path.join(__dirname, "..", "package.json");
+    const packageJsonPath = path.join(__dirname, '..', 'package.json');
     const {
         name: packageName,
         version: localVersion,
         author: { name },
     } = require(packageJsonPath);
 
-    // const response = await fetch(`${NPM_REGISTRY_URL}${packageName}`);
-    // const data = (await response.json()) as RegistryResponse;
-    // const npmVersion = data["dist-tags"].latest;
-    // console.log(compareVersions(localVersion, npmVersion));
+    const response = await fetch(`${NPM_REGISTRY_URL}${packageName}`);
+    const data = (await response.json()) as RegistryResponse;
+    const npmVersion = data['dist-tags'].latest;
+    const newerVersionAvailable =
+        compareVersions(npmVersion, localVersion) >= 1;
 
-    console.log(kleur.white().italic("Welcome to:"));
-    console.log(kleur.red("   ___      __  __          ___  ___ "));
-    console.log(kleur.yellow("  / _ )___ / /_/ /____ ____/ _ \\/ _ \\"));
-    console.log(kleur.green(" / _  / -_) __/ __/ -_) __/ ___/ , _/"));
-    console.log(kleur.cyan("/____/\\__/\\__/\\__/\\__/_/ /_/  /_/|_| \n"));
+    console.log(kleur.white().italic('Welcome to:'));
+    console.log(kleur.red('   ___      __  __          ___  ___ '));
+    console.log(kleur.yellow('  / _ )___ / /_/ /____ ____/ _ \\/ _ \\'));
+    console.log(kleur.green(' / _  / -_) __/ __/ -_) __/ ___/ , _/'));
+    console.log(kleur.cyan('/____/\\__/\\__/\\__/\\__/_/ /_/  /_/|_| \n'));
     console.log(
         kleur.italic(
-            `${" ".repeat(7)}${kleur.magenta(`v${localVersion}`)}${kleur.white(
-                " by "
+            `${' '.repeat(7)}${kleur.magenta(`v${localVersion}`)}${kleur.white(
+                ' by '
             )}${kleur.blue(name)}`
         )
     );
+    // Show New Version Banner
+    if (newerVersionAvailable) {
+        console.log(
+            kleur.italic(
+                `\n${' '.repeat(6)}Version ${kleur.green(
+                    npmVersion
+                )} available!`
+            )
+        );
+        console.log(kleur.yellow(' npm update -g @hunterparks/betterpr'));
+    }
     // Check Username and Password
-    console.log("");
+    console.log('');
     let useStoredCreds = false;
     if (betterPrCache.username && betterPrCache.password) {
         const { useCreds } = await prompts([
             {
-                type: "toggle",
-                name: "useCreds",
-                message: "Use stored credentials?",
+                type: 'toggle',
+                name: 'useCreds',
+                message: 'Use stored credentials?',
                 initial: true,
-                active: "Yes",
-                inactive: "No",
+                active: 'Yes',
+                inactive: 'No',
             },
         ]);
         useStoredCreds = useCreds;
     }
-    let username = "";
-    let password = "";
+    let username = '';
+    let password = '';
     if (useStoredCreds === true && betterPrCache.password) {
-        username = betterPrCache.username || "";
+        username = betterPrCache.username || '';
         password = passwordDecrypt(betterPrCache.password);
         console.log(
             `${greenCheck()}${kleur
                 .white()
-                .bold(" Using Bitbucket username:")} ${username}`
+                .bold(' Using Bitbucket username:')} ${username}`
         );
         console.log(
-            `${greenCheck()}${kleur.white().bold(" Using stored password! 🎉")}`
+            `${greenCheck()}${kleur.white().bold(' Using stored password! 🎉')}`
         );
     } else if (useStoredCreds === false) {
         // Get Username and App Password
         const { enteredUsername, enteredAppPassword } = await prompts([
             {
-                type: "text",
-                name: "enteredUsername",
-                message: "Enter your Bitbucket username>",
+                type: 'text',
+                name: 'enteredUsername',
+                message: 'Enter your Bitbucket username>',
                 validate: (value) =>
-                    !value ? "Must provide a username" : true,
+                    !value ? 'Must provide a username' : true,
             },
             {
-                type: "invisible",
-                name: "enteredAppPassword",
-                message: "Enter your Bitbucket APP password>",
+                type: 'invisible',
+                name: 'enteredAppPassword',
+                message: 'Enter your Bitbucket APP password>',
                 validate: (value) =>
-                    !value ? "Must provide an app password" : true,
+                    !value ? 'Must provide an app password' : true,
             },
         ]);
         if (!enteredUsername || !enteredAppPassword) {
@@ -151,17 +163,17 @@ const main = async () => {
         // Get User
         const { data: user } = await bitbucket.user.get({});
         // Check Workspace
-        console.log("");
+        console.log('');
         let useStoredWorkspace = false;
         if (betterPrCache.workspace) {
             const { useWorkspace } = await prompts([
                 {
-                    type: "toggle",
-                    name: "useWorkspace",
-                    message: "Use stored workspace?",
+                    type: 'toggle',
+                    name: 'useWorkspace',
+                    message: 'Use stored workspace?',
                     initial: true,
-                    active: "Yes",
-                    inactive: "No",
+                    active: 'Yes',
+                    inactive: 'No',
                 },
             ]);
             useStoredWorkspace = useWorkspace;
@@ -170,13 +182,13 @@ const main = async () => {
         if (useStoredWorkspace === true) {
             const { data: availableWorkspace } =
                 await bitbucket.workspaces.getWorkspace({
-                    workspace: betterPrCache.workspace || "",
+                    workspace: betterPrCache.workspace || '',
                 });
             workspace = availableWorkspace;
             console.log(
                 `${greenCheck()}${kleur
                     .white()
-                    .bold(" Using stored workspace:")} ${workspace.name || ""}`
+                    .bold(' Using stored workspace:')} ${workspace.name || ''}`
             );
         } else if (useStoredWorkspace === false) {
             // Workspaces
@@ -190,13 +202,13 @@ const main = async () => {
             });
             const { selectedWorkspace } = await prompts([
                 {
-                    type: "select",
-                    name: "selectedWorkspace",
-                    message: "Pick a workspace>",
+                    type: 'select',
+                    name: 'selectedWorkspace',
+                    message: 'Pick a workspace>',
                     choices: availableWorkspaces.map((availableWorkspace) => {
                         return {
-                            title: availableWorkspace.name || "",
-                            value: availableWorkspace.uuid || "",
+                            title: availableWorkspace.name || '',
+                            value: availableWorkspace.uuid || '',
                         };
                     }),
                 },
@@ -217,17 +229,17 @@ const main = async () => {
             return;
         }
         // Check Repos
-        console.log("");
+        console.log('');
         let useStoredRepos = false;
         if (betterPrCache.repositories) {
             const { useRepos } = await prompts([
                 {
-                    type: "toggle",
-                    name: "useRepos",
-                    message: "Use stored repositories?",
+                    type: 'toggle',
+                    name: 'useRepos',
+                    message: 'Use stored repositories?',
                     initial: true,
-                    active: "Yes",
-                    inactive: "No",
+                    active: 'Yes',
+                    inactive: 'No',
                 },
             ]);
             useStoredRepos = useRepos;
@@ -240,7 +252,7 @@ const main = async () => {
                         const { data: repoData } =
                             await bitbucket.repositories.get({
                                 repo_slug: repo,
-                                workspace: workspace.uuid || "",
+                                workspace: workspace.uuid || '',
                             });
                         repos.push(repoData);
                     }
@@ -249,9 +261,9 @@ const main = async () => {
             console.log(
                 `${greenCheck()}${kleur
                     .white()
-                    .bold(" Using stored repositories:")} ${repos
-                    .map((repo) => repo.name || "")
-                    .join(", ")}`
+                    .bold(' Using stored repositories:')} ${repos
+                    .map((repo) => repo.name || '')
+                    .join(', ')}`
             );
         } else if (useStoredRepos === false) {
             // Repositories
@@ -267,13 +279,13 @@ const main = async () => {
             });
             const { selectedRepos } = await prompts([
                 {
-                    type: "multiselect",
-                    name: "selectedRepos",
-                    message: "Pick repositories>",
+                    type: 'multiselect',
+                    name: 'selectedRepos',
+                    message: 'Pick repositories>',
                     choices: availableRepos.map((availableRepo) => {
                         return {
-                            title: availableRepo.name || "",
-                            value: availableRepo.uuid || "",
+                            title: availableRepo.name || '',
+                            value: availableRepo.uuid || '',
                         };
                     }),
                 },
@@ -285,30 +297,37 @@ const main = async () => {
             repos = availableRepos.filter((availableRepo) =>
                 selectedRepos.includes(availableRepo.uuid)
             ) as Array<Schema.Repository>;
-            betterPrCache.repositories = repos.map((repo) => repo.uuid || "");
+            betterPrCache.repositories = repos.map((repo) => repo.uuid || '');
             saveCache(betterPrCache);
         } else {
             sayGoodbye();
         }
+        let counts = {
+            reviewerUnapproved: 0,
+            reviewerApproved: 0,
+            notReviewer: 0,
+            author: 0,
+            wip: 0,
+        };
         for (let repo of repos) {
             console.log(
-                "\n" +
-                    kleur.green().bold("[Open] ") +
+                '\n' +
+                    kleur.green().bold('[Open] ') +
                     kleur
                         .white()
-                        .bold(`PRs for ${kleur.italic(repo.name || "")}`)
+                        .bold(`PRs for ${kleur.italic(repo.name || '')}`)
             );
 
             const { data: prData } =
                 await bitbucket.repositories.listPullRequests({
-                    repo_slug: repo.uuid || "",
-                    state: "OPEN",
-                    workspace: workspace.uuid || "",
+                    repo_slug: repo.uuid || '',
+                    state: 'OPEN',
+                    workspace: workspace.uuid || '',
                     pagelen: 50,
                 });
             let openPrs = prData.values as Array<Schema.Pullrequest>;
             if (openPrs.length <= 0) {
-                console.log(kleur.italic("No open PRs! 🎉"));
+                console.log(kleur.italic('No open PRs! 🎉'));
                 continue;
             }
             const organizedPrs: Array<{
@@ -316,46 +335,34 @@ const main = async () => {
                 order: number;
             }> = [];
             const load = loading({
-                text: kleur.italic("Loading PRs..."),
-                color: "magenta",
+                text: kleur.italic('Loading PRs...'),
+                color: 'magenta',
             }).start();
             for (let pr of openPrs) {
                 const { data } = await bitbucket.repositories.getPullRequest({
                     pull_request_id: pr.id || 0,
-                    repo_slug: repo.uuid || "",
-                    workspace: workspace.uuid || "",
+                    repo_slug: repo.uuid || '',
+                    workspace: workspace.uuid || '',
                 });
                 // Order:
                 //   10 - Reviewer Unapproved
                 //   20 - Reviewer Approved
                 //   30 - Not Reviewer
-                //   40 - Author with Changes
-                //   50 - Author
-                //   60 - WIP
+                //   40 - Author
+                //   50 - WIP
                 if (
                     data.title &&
-                    data.title.toLocaleLowerCase().indexOf("[wip]") !== -1
+                    data.title.toLocaleLowerCase().indexOf('[wip]') !== -1
                 ) {
                     organizedPrs.push({
-                        order: 60,
+                        order: 50,
                         pr: data,
                     });
                 } else if (data.author && data.author.uuid === user.uuid) {
-                    if (
-                        data.participants
-                            ?.map((participant) => participant.state || "")
-                            .some((state) => state === "changes_requested")
-                    ) {
-                        organizedPrs.push({
-                            order: 40,
-                            pr: data,
-                        });
-                    } else {
-                        organizedPrs.push({
-                            order: 50,
-                            pr: data,
-                        });
-                    }
+                    organizedPrs.push({
+                        order: 40,
+                        pr: data,
+                    });
                 } else {
                     const participation = data.participants?.find(
                         (participant) => participant.user?.uuid === user.uuid
@@ -383,46 +390,55 @@ const main = async () => {
             organizedPrs
                 .sort((prA, prB) => prA.order - prB.order)
                 .forEach((organizedPr, index) => {
-                    let prepend = "";
+                    load.stop();
+                    let prepend = '';
                     switch (organizedPr.order) {
                         case 10: {
                             // Reviewer Unapproved
+                            counts.reviewerUnapproved += 1;
                             prepend = redEx();
                             break;
                         }
                         case 20: {
                             // Reviewer Approved
+                            counts.reviewerApproved += 1;
                             prepend = greenCheck();
                             break;
                         }
                         case 30: {
                             // Not Reviewer
+                            counts.notReviewer += 1;
                             prepend = magentaQuestion();
                             break;
                         }
                         case 40: {
-                            // Author with Changes
-                            prepend = yellowTri();
-                            break;
-                        }
-                        case 50: {
                             // Author
+                            counts.author += 1;
                             prepend = blueCircle();
                             break;
                         }
-                        case 60: {
+                        case 50: {
                             // WIP
-                            prepend = " ";
+                            counts.wip += 1;
+                            prepend = ' ';
                             break;
                         }
                         default: {
-                            prepend = kleur.white("-");
+                            prepend = kleur.white('-');
                         }
                     }
-                    load.stop();
+                    if (
+                        organizedPr.pr.participants
+                            ?.map((participant) => participant.state || '')
+                            .some((state) => state === 'changes_requested')
+                    ) {
+                        prepend = `${yellowTri()} ${prepend}`;
+                    } else {
+                        prepend = `  ${prepend}`;
+                    }
                     const approvedCount = organizedPr.pr.participants?.reduce(
                         (prev, curr) => {
-                            if (curr.role === "REVIEWER") {
+                            if (curr.role === 'REVIEWER') {
                                 return prev + (curr.approved ? 1 : 0);
                             }
                             return prev;
@@ -440,17 +456,40 @@ const main = async () => {
                     }
                     if (organizedPr.pr.title) {
                         console.log(
-                            (index > 0 ? "" : "\n") +
+                            (index > 0 ? '' : '\n') +
                                 `${prepend} ` +
                                 `${approvalText} ` +
                                 makeLink(
                                     organizedPr.pr.title,
-                                    organizedPr.pr.links?.html?.href || ""
+                                    organizedPr.pr.links?.html?.href || ''
                                 )
                         );
                     }
                 });
         }
+        console.log('');
+        console.log(
+            kleur.red(
+                `${redEx()} ${
+                    counts.reviewerUnapproved
+                } - Reviewer, Not Approved`
+            )
+        );
+        console.log(
+            kleur.green(
+                `${greenCheck()} ${
+                    counts.reviewerApproved
+                } - Reviewer, Approved`
+            )
+        );
+        console.log(
+            kleur.magenta(
+                `${magentaQuestion()} ${counts.notReviewer} - Not Reviewer`
+            )
+        );
+        console.log(kleur.blue(`${blueCircle()} ${counts.author} - Author`));
+        console.log(`  ${counts.wip} - Work In Progress`);
+        console.log(kleur.yellow(`${yellowTri()}   - Requested Changes`));
     } catch (error) {
         errorMessage((error as any).message);
         betterPrCache = {};
@@ -462,11 +501,11 @@ const main = async () => {
 };
 
 const makeLink = (text: string, url: string) => {
-    const OSC = "\u001B]";
-    const SEP = ";";
-    const BEL = "\u0007";
-    return [OSC, "8", SEP, SEP, url, BEL, text, OSC, "8", SEP, SEP, BEL].join(
-        ""
+    const OSC = '\u001B]';
+    const SEP = ';';
+    const BEL = '\u0007';
+    return [OSC, '8', SEP, SEP, url, BEL, text, OSC, '8', SEP, SEP, BEL].join(
+        ''
     );
 };
 
@@ -474,10 +513,10 @@ const passwordDecrypt = (cyphertext: BetterPrCachePassword) => {
     const decipher = crypto.createDecipheriv(
         algo,
         key,
-        Buffer.from(cyphertext.iv, "hex")
+        Buffer.from(cyphertext.iv, 'hex')
     );
     const decrpyted = Buffer.concat([
-        decipher.update(Buffer.from(cyphertext.content, "hex")),
+        decipher.update(Buffer.from(cyphertext.content, 'hex')),
         decipher.final(),
     ]);
     return decrpyted.toString();
@@ -488,28 +527,32 @@ const passwordEncrypt = (plaintext: string): BetterPrCachePassword => {
     const cipher = crypto.createCipheriv(algo, key, iv);
     const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
     return {
-        iv: iv.toString("hex"),
-        content: encrypted.toString("hex"),
+        iv: iv.toString('hex'),
+        content: encrypted.toString('hex'),
     };
 };
 
-const magentaQuestion = () => kleur.magenta("?");
+const magentaQuestion = () => kleur.magenta('?');
 
-const redEx = () => kleur.red("✖");
+const redEx = () => kleur.red('✖');
 
 const sayGoodbye = () =>
     console.log(
-        kleur.white().italic("\nGoodbye!"),
-        redEx(),
-        yellowTri(),
-        greenCheck(),
-        blueCircle(),
-        magentaQuestion()
+        kleur.white().italic('\nGoodbye!'),
+        kleur.red('■'),
+        kleur.yellow('■'),
+        kleur.green('■'),
+        kleur.cyan('■'),
+        kleur.blue('■'),
+        kleur.magenta('■'),
+        kleur.white('■'),
+        kleur.grey('■'),
+        kleur.black('■')
     );
 
 const saveCache = (cache: BetterPrCache) =>
     fs.writeFileSync(cacheFilePath, JSON.stringify(cache));
 
-const yellowTri = () => kleur.yellow("▲");
+const yellowTri = () => kleur.yellow('▲');
 
 main();
