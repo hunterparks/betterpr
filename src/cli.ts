@@ -6,8 +6,10 @@ import fs from "fs";
 import kleur from "kleur";
 import loading from "loading-cli";
 import { Options, Schema } from "bitbucket/lib/bitbucket";
+import fetch from "node-fetch";
 import path from "path";
 import prompts from "prompts";
+import { compareVersions } from "./lib/utils";
 
 type BetterPrCache = {
     username?: string;
@@ -19,6 +21,11 @@ type BetterPrCachePassword = {
     iv: string;
     content: string;
 };
+// type RegistryResponse = {
+//     "dist-tags": {
+//         latest: string;
+//     };
+// };
 const baseClientOptions: Options = {
     baseUrl: "https://api.bitbucket.org/2.0",
     notice: false,
@@ -27,6 +34,7 @@ const cacheFileName = "betterpr_cache.json";
 const cacheFilePath = path.join(__dirname, cacheFileName);
 const algo = "aes-256-ctr";
 const key = "NSCcA4wvkQxTKaJp7fFJsQM7mR8WEghn";
+const NPM_REGISTRY_URL = "https://registry.npmjs.com/";
 
 const blueCircle = () => kleur.blue("●");
 
@@ -46,9 +54,16 @@ const main = async () => {
     // Version and Header
     const packageJsonPath = path.join(__dirname, "..", "package.json");
     const {
-        version,
+        name: packageName,
+        version: localVersion,
         author: { name },
     } = require(packageJsonPath);
+
+    // const response = await fetch(`${NPM_REGISTRY_URL}${packageName}`);
+    // const data = (await response.json()) as RegistryResponse;
+    // const npmVersion = data["dist-tags"].latest;
+    // console.log(compareVersions(localVersion, npmVersion));
+
     console.log(kleur.white().italic("Welcome to:"));
     console.log(kleur.red("   ___      __  __          ___  ___ "));
     console.log(kleur.yellow("  / _ )___ / /_/ /____ ____/ _ \\/ _ \\"));
@@ -56,7 +71,7 @@ const main = async () => {
     console.log(kleur.cyan("/____/\\__/\\__/\\__/\\__/_/ /_/  /_/|_| \n"));
     console.log(
         kleur.italic(
-            `${" ".repeat(7)}${kleur.magenta(`v${version}`)}${kleur.white(
+            `${" ".repeat(7)}${kleur.magenta(`v${localVersion}`)}${kleur.white(
                 " by "
             )}${kleur.blue(name)}`
         )
