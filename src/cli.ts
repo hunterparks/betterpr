@@ -86,7 +86,7 @@ const main = async () => {
                 )} available!`
             )
         );
-        console.log(kleur.yellow(' npm update -g @hunterparks/betterpr'));
+        console.log(kleur.yellow('   npm up -g @hunterparks/betterpr'));
     }
     // Check Username and Password
     console.log('');
