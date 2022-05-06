@@ -1,0 +1,101 @@
+:root {
+    /* Polar Night */
+    --nord0: #2E3440;
+    --nord1: #3B4252; /* Light */
+    --nord2: #434C5E; /* Lighter */
+    --nord3: #4C566A; /* Lightest */
+    /* Snow Storm */
+    --nord4: #D8DEE9;
+    --nord5: #E5E9F0; /* Lighter */
+    --nord6: #ECEFF4; /* Lightest */
+    /* Frost */
+    --nord7: #8FBCBB;
+    --nord8: #88C0D0;
+    --nord9: #81A1C1;
+    --nord10: #5E81AC;
+    /* Aurora */
+    --nord11: #BF616A; /* Red */
+    --nord12: #D08770; /* Orange */
+    --nord13: #EBCB8B; /* Yellow */
+    --nord14: #A3BE8C; /* Green */
+    --nord15: #B48EAD; /* Magenta */
+    /* Normals */
+    --black: var(--nord0);
+    --grey: var(--nord1);
+    --red: var(--nord11);
+    --green: var(--nord14);
+    --yellow: var(--nord13);
+    --blue: var(--nord9);
+    --magenta: var(--nord15);
+    --cyan: var(--nord8);
+    --white: var(--nord5);
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--black);
+    color: var(--white);
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0 auto;
+    text-align: center;
+    width: 75%;
+}
+
+a {
+    color: var(--blue);
+}
+
+a:visited {
+    color: var(--magenta);
+}
+
+.italic {
+    font-style: italic;
+}
+
+.header {
+    background-clip: text;
+    -webkit-background-clip: text;
+    background-image: linear-gradient(
+        var(--red),
+        var(--red) 25%,
+        var(--yellow) 25%,
+        var(--yellow) 50%,
+        var(--green) 50%,
+        var(--green) 75%,
+        var(--cyan) 75%
+    );
+    color: var(--black);
+    font-size: 5rem;
+    font-weight: bold;
+    margin: 4rem 0;
+    transform: skew(-20deg);
+    -webkit-text-stroke: 8px transparent;
+}
+
+main section:not(:last-child) {
+    line-height: 1.4;
+    margin-bottom: 2rem;
+}
+
+section.code {
+    background-color: var(--nord1);
+    font-family: 'Courier New', Courier, monospace;
+    height: 2rem;
+    line-height: 2rem;
+    margin: 0 auto;
+    width: 80%;
+}
+
+footer {
+    bottom: 0;
+    line-height: 3rem;
+    position: fixed;
+    text-align: left;
+    width: 75%;
+}
