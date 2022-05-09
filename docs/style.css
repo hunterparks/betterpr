@@ -1,24 +1,24 @@
 :root {
     /* Polar Night */
-    --nord0: #2E3440;
-    --nord1: #3B4252; /* Light */
-    --nord2: #434C5E; /* Lighter */
-    --nord3: #4C566A; /* Lightest */
+    --nord0: #2e3440;
+    --nord1: #3b4252; /* Light */
+    --nord2: #434c5e; /* Lighter */
+    --nord3: #4c566a; /* Lightest */
     /* Snow Storm */
-    --nord4: #D8DEE9;
-    --nord5: #E5E9F0; /* Lighter */
-    --nord6: #ECEFF4; /* Lightest */
+    --nord4: #d8dee9;
+    --nord5: #e5e9f0; /* Lighter */
+    --nord6: #eceff4; /* Lightest */
     /* Frost */
-    --nord7: #8FBCBB;
-    --nord8: #88C0D0;
-    --nord9: #81A1C1;
-    --nord10: #5E81AC;
+    --nord7: #8fbcbb;
+    --nord8: #88c0d0;
+    --nord9: #81a1c1;
+    --nord10: #5e81ac;
     /* Aurora */
-    --nord11: #BF616A; /* Red */
-    --nord12: #D08770; /* Orange */
-    --nord13: #EBCB8B; /* Yellow */
-    --nord14: #A3BE8C; /* Green */
-    --nord15: #B48EAD; /* Magenta */
+    --nord11: #bf616a; /* Red */
+    --nord12: #d08770; /* Orange */
+    --nord13: #ebcb8b; /* Yellow */
+    --nord14: #a3be8c; /* Green */
+    --nord15: #b48ead; /* Magenta */
     /* Normals */
     --black: var(--nord0);
     --grey: var(--nord1);
@@ -31,7 +31,9 @@
     --white: var(--nord5);
 }
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
@@ -42,6 +44,7 @@ body {
     color: var(--white);
     font-family: Arial, Helvetica, sans-serif;
     margin: 0 auto;
+    max-width: 45rem;
     text-align: center;
     width: 75%;
 }
