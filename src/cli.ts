@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { Bitbucket } from 'bitbucket';
-import crypto from 'crypto';
 import fs from 'fs';
 import kleur from 'kleur';
 import loading from 'loading-cli';
@@ -10,47 +9,24 @@ const fetch = require('node-fetch');
 import path from 'path';
 import prompts from 'prompts';
 import { compareVersions } from './lib/utils';
+import { passwordDecrypt, passwordEncrypt } from './lib/crypto';
+import { errorMessage, icons, makeLink } from './lib/terminal';
+import type {
+    BetterPrCache,
+    BetterPrCacheRepository,
+    BetterPrCacheWorkspace,
+    RegistryResponse,
+} from './lib/types';
 
-type BetterPrCache = {
-    username?: string;
-    password?: BetterPrCachePassword;
-    workspace?: string;
-    repositories?: Array<string>;
-};
-type BetterPrCachePassword = {
-    iv: string;
-    content: string;
-};
-type RegistryResponse = {
-    'dist-tags': {
-        latest: string;
-    };
-};
 const baseClientOptions: Options = {
     baseUrl: 'https://api.bitbucket.org/2.0',
     notice: false,
 };
 const cacheFileName = 'betterpr_cache.json';
 const cacheFilePath = path.join(__dirname, cacheFileName);
-const algo = 'aes-256-ctr';
-const key = 'NSCcA4wvkQxTKaJp7fFJsQM7mR8WEghn';
 const NPM_REGISTRY_URL = 'https://registry.npmjs.com/';
 
-const blueCircle = () => kleur.blue('●');
-
-const errorMessage = (message: string) =>
-    console.log(`${kleur.red().bold('Error:')} ${message}`);
-
-const greenCheck = () => kleur.green('✔');
-
 const main = async () => {
-    // Get State Configuration
-    if (!fs.existsSync(cacheFilePath)) {
-        fs.writeFileSync(cacheFilePath, JSON.stringify({}));
-    }
-    let betterPrCache: BetterPrCache = JSON.parse(
-        fs.readFileSync(cacheFilePath, { encoding: 'utf8' })
-    );
     // Version and Header
     const packageJsonPath = path.join(__dirname, '..', 'package.json');
     const {
@@ -58,6 +34,18 @@ const main = async () => {
         version: localVersion,
         author: { name },
     } = require(packageJsonPath);
+    // Get State Configuration
+    if (!fs.existsSync(cacheFilePath)) {
+        fs.writeFileSync(
+            cacheFilePath,
+            JSON.stringify({
+                version: localVersion,
+            })
+        );
+    }
+    let betterPrCache: BetterPrCache = JSON.parse(
+        fs.readFileSync(cacheFilePath, { encoding: 'utf8' })
+    );
 
     const response = await fetch(`${NPM_REGISTRY_URL}${packageName}`);
     const data = (await response.json()) as RegistryResponse;
@@ -88,6 +76,15 @@ const main = async () => {
         );
         console.log(kleur.yellow('   npm up -g @hunterparks/betterpr'));
     }
+    if (
+        !betterPrCache.version ||
+        compareVersions(localVersion, betterPrCache.version) >= 1
+    ) {
+        betterPrCache.version = localVersion;
+        betterPrCache.workspace = undefined;
+        betterPrCache.repositories = undefined;
+        saveCache(betterPrCache);
+    }
     // Check Username and Password
     console.log('');
     let useStoredCreds = false;
@@ -110,12 +107,14 @@ const main = async () => {
         username = betterPrCache.username || '';
         password = passwordDecrypt(betterPrCache.password);
         console.log(
-            `${greenCheck()}${kleur
+            `${icons.greenCheck()}${kleur
                 .white()
                 .bold(' Using Bitbucket username:')} ${username}`
         );
         console.log(
-            `${greenCheck()}${kleur.white().bold(' Using stored password! 🎉')}`
+            `${icons.greenCheck()}${kleur
+                .white()
+                .bold(' Using stored password! 🎉')}`
         );
     } else if (useStoredCreds === false) {
         // Get Username and App Password
@@ -178,15 +177,11 @@ const main = async () => {
             ]);
             useStoredWorkspace = useWorkspace;
         }
-        let workspace: Schema.Workspace;
+        let workspace: Schema.Workspace | BetterPrCacheWorkspace;
         if (useStoredWorkspace === true) {
-            const { data: availableWorkspace } =
-                await bitbucket.workspaces.getWorkspace({
-                    workspace: betterPrCache.workspace || '',
-                });
-            workspace = availableWorkspace;
+            workspace = betterPrCache.workspace as BetterPrCacheWorkspace;
             console.log(
-                `${greenCheck()}${kleur
+                `${icons.greenCheck()}${kleur
                     .white()
                     .bold(' Using stored workspace:')} ${workspace.name || ''}`
             );
@@ -221,7 +216,10 @@ const main = async () => {
                 (availableWorkspace) =>
                     availableWorkspace.uuid === selectedWorkspace
             ) as Schema.Workspace;
-            betterPrCache.workspace = workspace.uuid;
+            betterPrCache.workspace = {
+                uuid: workspace.uuid || '',
+                name: workspace.name || '',
+            };
             betterPrCache.repositories = undefined;
             saveCache(betterPrCache);
         } else {
@@ -244,22 +242,13 @@ const main = async () => {
             ]);
             useStoredRepos = useRepos;
         }
-        let repos: Array<Schema.Repository> = [];
+        let repos: Array<Schema.Repository> | Array<BetterPrCacheRepository> =
+            [];
         if (useStoredRepos === true) {
-            await Promise.all(
-                (betterPrCache.repositories as Array<string>).map(
-                    async (repo) => {
-                        const { data: repoData } =
-                            await bitbucket.repositories.get({
-                                repo_slug: repo,
-                                workspace: workspace.uuid || '',
-                            });
-                        repos.push(repoData);
-                    }
-                )
-            );
+            repos =
+                betterPrCache.repositories as Array<BetterPrCacheRepository>;
             console.log(
-                `${greenCheck()}${kleur
+                `${icons.greenCheck()}${kleur
                     .white()
                     .bold(' Using stored repositories:')} ${repos
                     .map((repo) => repo.name || '')
@@ -297,7 +286,12 @@ const main = async () => {
             repos = availableRepos.filter((availableRepo) =>
                 selectedRepos.includes(availableRepo.uuid)
             ) as Array<Schema.Repository>;
-            betterPrCache.repositories = repos.map((repo) => repo.uuid || '');
+            betterPrCache.repositories = repos.map((repo) => {
+                return {
+                    uuid: repo.uuid || '',
+                    name: repo.name || '',
+                };
+            });
             saveCache(betterPrCache);
         } else {
             sayGoodbye();
@@ -396,25 +390,25 @@ const main = async () => {
                         case 10: {
                             // Reviewer Unapproved
                             counts.reviewerUnapproved += 1;
-                            prepend = redEx();
+                            prepend = icons.redEx();
                             break;
                         }
                         case 20: {
                             // Reviewer Approved
                             counts.reviewerApproved += 1;
-                            prepend = greenCheck();
+                            prepend = icons.greenCheck();
                             break;
                         }
                         case 30: {
                             // Not Reviewer
                             counts.notReviewer += 1;
-                            prepend = magentaQuestion();
+                            prepend = icons.magentaQuestion();
                             break;
                         }
                         case 40: {
                             // Author
                             counts.author += 1;
-                            prepend = blueCircle();
+                            prepend = icons.blueCircle();
                             break;
                         }
                         case 50: {
@@ -432,7 +426,7 @@ const main = async () => {
                             ?.map((participant) => participant.state || '')
                             .some((state) => state === 'changes_requested')
                     ) {
-                        prepend = `${yellowTri()} ${prepend}`;
+                        prepend = `${icons.yellowTri()} ${prepend}`;
                     } else {
                         prepend = `  ${prepend}`;
                     }
@@ -467,74 +461,67 @@ const main = async () => {
                     }
                 });
         }
+        const anyCountOver9 = Object.values(counts).some((count) => count > 9);
         console.log('');
         console.log(
             kleur.red(
-                `${redEx()} ${
-                    counts.reviewerUnapproved
+                `${icons.redEx()} ${
+                    counts.reviewerUnapproved < 10 && anyCountOver9
+                        ? ` ${counts.reviewerUnapproved}`
+                        : counts.reviewerUnapproved
                 } - Reviewer, Not Approved`
             )
         );
         console.log(
             kleur.green(
-                `${greenCheck()} ${
-                    counts.reviewerApproved
+                `${icons.greenCheck()} ${
+                    counts.reviewerApproved < 10 && anyCountOver9
+                        ? ` ${counts.reviewerApproved}`
+                        : counts.reviewerApproved
                 } - Reviewer, Approved`
             )
         );
         console.log(
             kleur.magenta(
-                `${magentaQuestion()} ${counts.notReviewer} - Not Reviewer`
+                `${icons.magentaQuestion()} ${
+                    counts.notReviewer < 10 && anyCountOver9
+                        ? ` ${counts.notReviewer}`
+                        : counts.notReviewer
+                } - Not Reviewer`
             )
         );
-        console.log(kleur.blue(`${blueCircle()} ${counts.author} - Author`));
-        console.log(`  ${counts.wip} - Work In Progress`);
-        console.log(kleur.yellow(`${yellowTri()}   - Requested Changes`));
+        console.log(
+            kleur.blue(
+                `${icons.blueCircle()} ${
+                    counts.author < 10 && anyCountOver9
+                        ? ` ${counts.author}`
+                        : counts.author
+                } - Author`
+            )
+        );
+        console.log(
+            `  ${
+                counts.wip < 10 && anyCountOver9 ? ` ${counts.wip}` : counts.wip
+            } - Work In Progress`
+        );
+        console.log(
+            kleur.yellow(
+                `${icons.yellowTri()} ${
+                    anyCountOver9 ? '  ' : ' '
+                } - Requested Changes`
+            )
+        );
     } catch (error) {
         errorMessage((error as any).message);
-        betterPrCache = {};
+        betterPrCache = {
+            version: localVersion,
+        };
         saveCache(betterPrCache);
     } finally {
         sayGoodbye();
         return;
     }
 };
-
-const makeLink = (text: string, url: string) => {
-    const OSC = '\u001B]';
-    const SEP = ';';
-    const BEL = '\u0007';
-    return [OSC, '8', SEP, SEP, url, BEL, text, OSC, '8', SEP, SEP, BEL].join(
-        ''
-    );
-};
-
-const passwordDecrypt = (cyphertext: BetterPrCachePassword) => {
-    const decipher = crypto.createDecipheriv(
-        algo,
-        key,
-        Buffer.from(cyphertext.iv, 'hex')
-    );
-    const decrpyted = Buffer.concat([
-        decipher.update(Buffer.from(cyphertext.content, 'hex')),
-        decipher.final(),
-    ]);
-    return decrpyted.toString();
-};
-
-const passwordEncrypt = (plaintext: string): BetterPrCachePassword => {
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv(algo, key, iv);
-    const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-    return {
-        iv: iv.toString('hex'),
-        content: encrypted.toString('hex'),
-    };
-};
-
-const magentaQuestion = () => kleur.magenta('?');
-
-const redEx = () => kleur.red('✖');
 
 const sayGoodbye = () =>
     console.log(
@@ -552,7 +539,5 @@ const sayGoodbye = () =>
 
 const saveCache = (cache: BetterPrCache) =>
     fs.writeFileSync(cacheFilePath, JSON.stringify(cache));
-
-const yellowTri = () => kleur.yellow('▲');
 
 main();
