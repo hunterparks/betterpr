@@ -10,7 +10,16 @@ import path from 'path';
 import prompts from 'prompts';
 import { compareVersions } from './lib/utils';
 import { passwordDecrypt, passwordEncrypt } from './lib/crypto';
-import { errorMessage, icons, makeLink } from './lib/terminal';
+import {
+    errorMessage,
+    icons,
+    printHeader,
+    printNewVersionNotice,
+    printRepoHeader,
+    printRepoLine,
+    printTotalLine,
+    sayGoodbye,
+} from './lib/terminal';
 import type {
     BetterPrCache,
     BetterPrCacheRepository,
@@ -53,29 +62,11 @@ const main = async () => {
     const newerVersionAvailable =
         compareVersions(npmVersion, localVersion) >= 1;
 
-    console.log(kleur.white().italic('Welcome to:'));
-    console.log(kleur.red('   ___      __  __          ___  ___ '));
-    console.log(kleur.yellow('  / _ )___ / /_/ /____ ____/ _ \\/ _ \\'));
-    console.log(kleur.green(' / _  / -_) __/ __/ -_) __/ ___/ , _/'));
-    console.log(kleur.cyan('/____/\\__/\\__/\\__/\\__/_/ /_/  /_/|_| \n'));
-    console.log(
-        kleur.italic(
-            `${' '.repeat(7)}${kleur.magenta(`v${localVersion}`)}${kleur.white(
-                ' by '
-            )}${kleur.blue(name)}`
-        )
-    );
-    // Show New Version Banner
+    printHeader(localVersion, name);
     if (newerVersionAvailable) {
-        console.log(
-            kleur.italic(
-                `\n${' '.repeat(6)}Version ${kleur.green(
-                    npmVersion
-                )} available!`
-            )
-        );
-        console.log(kleur.yellow('   npm up -g @hunterparks/betterpr'));
+        printNewVersionNotice(npmVersion);
     }
+
     if (
         !betterPrCache.version ||
         compareVersions(localVersion, betterPrCache.version) >= 1
@@ -304,210 +295,131 @@ const main = async () => {
             wip: 0,
         };
         for (let repo of repos) {
-            console.log(
-                '\n' +
-                    kleur.green().bold('[Open] ') +
-                    kleur
-                        .white()
-                        .bold(`PRs for ${kleur.italic(repo.name || '')}`)
-            );
-
-            const { data: prData } =
+            printRepoHeader(repo.name);
+            const { data: rawPrs } =
                 await bitbucket.repositories.listPullRequests({
                     repo_slug: repo.uuid || '',
                     state: 'OPEN',
                     workspace: workspace.uuid || '',
                     pagelen: 50,
                 });
-            let openPrs = prData.values as Array<Schema.Pullrequest>;
+            let openPrs = rawPrs.values as Array<Schema.Pullrequest>;
             if (openPrs.length <= 0) {
                 console.log(kleur.italic('No open PRs! 🎉'));
                 continue;
             }
-            const organizedPrs: Array<{
-                pr: Schema.Pullrequest;
-                order: number;
-            }> = [];
             const load = loading({
                 text: kleur.italic('Loading PRs...'),
                 color: 'magenta',
             }).start();
-            for (let pr of openPrs) {
-                const { data } = await bitbucket.repositories.getPullRequest({
-                    pull_request_id: pr.id || 0,
-                    repo_slug: repo.uuid || '',
-                    workspace: workspace.uuid || '',
-                });
-                // Order:
-                //   10 - Reviewer Unapproved
-                //   20 - Reviewer Approved
-                //   30 - Not Reviewer
-                //   40 - Author
-                //   50 - WIP
-                if (
-                    data.title &&
-                    data.title.toLocaleLowerCase().indexOf('[wip]') !== -1
-                ) {
-                    organizedPrs.push({
-                        order: 50,
-                        pr: data,
-                    });
-                } else if (data.author && data.author.uuid === user.uuid) {
-                    organizedPrs.push({
-                        order: 40,
-                        pr: data,
-                    });
-                } else {
-                    const participation = data.participants?.find(
-                        (participant) => participant.user?.uuid === user.uuid
-                    ) as Schema.Participant;
-                    if (!participation) {
-                        organizedPrs.push({
-                            order: 30,
-                            pr: data,
-                        });
-                    } else {
-                        if (participation.approved) {
-                            organizedPrs.push({
-                                order: 20,
-                                pr: data,
+            const formattedPrs = (
+                await Promise.all(
+                    openPrs.map(async (openPr) => {
+                        const { data: rawPr } =
+                            await bitbucket.repositories.getPullRequest({
+                                pull_request_id: openPr.id || 0,
+                                repo_slug: repo.uuid || '',
+                                workspace: workspace.uuid || '',
                             });
-                        } else {
-                            organizedPrs.push({
-                                order: 10,
-                                pr: data,
-                            });
-                        }
-                    }
-                }
-            }
-            organizedPrs
-                .sort((prA, prB) => prA.order - prB.order)
-                .forEach((organizedPr, index) => {
-                    load.stop();
-                    let prepend = '';
-                    switch (organizedPr.order) {
-                        case 10: {
-                            // Reviewer Unapproved
-                            counts.reviewerUnapproved += 1;
-                            prepend = icons.redEx();
-                            break;
-                        }
-                        case 20: {
-                            // Reviewer Approved
-                            counts.reviewerApproved += 1;
-                            prepend = icons.greenCheck();
-                            break;
-                        }
-                        case 30: {
-                            // Not Reviewer
-                            counts.notReviewer += 1;
-                            prepend = icons.magentaQuestion();
-                            break;
-                        }
-                        case 40: {
-                            // Author
-                            counts.author += 1;
-                            prepend = icons.blueCircle();
-                            break;
-                        }
-                        case 50: {
-                            // WIP
+                        // Order:
+                        //   10 - Reviewer Unapproved
+                        //   20 - Reviewer Approved
+                        //   30 - Not Reviewer
+                        //   40 - Author
+                        //   50 - WIP
+                        if (
+                            rawPr.title &&
+                            rawPr.title.toLowerCase().indexOf('[wip]') !== -1
+                        ) {
                             counts.wip += 1;
-                            prepend = ' ';
-                            break;
-                        }
-                        default: {
-                            prepend = kleur.white('-');
-                        }
-                    }
-                    if (
-                        organizedPr.pr.participants
-                            ?.map((participant) => participant.state || '')
-                            .some((state) => state === 'changes_requested')
-                    ) {
-                        prepend = `${icons.yellowTri()} ${prepend}`;
-                    } else {
-                        prepend = `  ${prepend}`;
-                    }
-                    const approvedCount = organizedPr.pr.participants?.reduce(
-                        (prev, curr) => {
-                            if (curr.role === 'REVIEWER') {
-                                return prev + (curr.approved ? 1 : 0);
+                            return {
+                                order: 50,
+                                display: printRepoLine(50, rawPr),
+                            };
+                        } else if (
+                            rawPr.author &&
+                            rawPr.author.uuid === user.uuid
+                        ) {
+                            counts.author += 1;
+                            return {
+                                order: 40,
+                                display: printRepoLine(40, rawPr),
+                            };
+                        } else {
+                            const participation = rawPr.participants?.find(
+                                (participant) =>
+                                    participant.user?.uuid !== user.uuid
+                            ) as Schema.Participant;
+                            if (!participation) {
+                                counts.notReviewer += 1;
+                                return {
+                                    order: 30,
+                                    display: printRepoLine(30, rawPr),
+                                };
+                            } else {
+                                if (participation.approved) {
+                                    counts.reviewerApproved += 1;
+                                    return {
+                                        order: 20,
+                                        display: printRepoLine(20, rawPr),
+                                    };
+                                } else {
+                                    counts.reviewerUnapproved += 1;
+                                    return {
+                                        order: 10,
+                                        display: printRepoLine(10, rawPr),
+                                    };
+                                }
                             }
-                            return prev;
-                        },
-                        0
-                    ) as number;
-                    const approvalsNeeded = 2;
-                    let approvalText = `[${approvedCount}/${approvalsNeeded}]`;
-                    if (approvedCount <= 0) {
-                        approvalText = kleur.red(approvalText);
-                    } else if (approvedCount >= approvalsNeeded) {
-                        approvalText = kleur.green(approvalText);
-                    } else {
-                        approvalText = kleur.yellow(approvalText);
-                    }
-                    if (organizedPr.pr.title) {
-                        console.log(
-                            (index > 0 ? '' : '\n') +
-                                `${prepend} ` +
-                                `${approvalText} ` +
-                                makeLink(
-                                    organizedPr.pr.title,
-                                    organizedPr.pr.links?.html?.href || ''
-                                )
-                        );
-                    }
-                });
+                        }
+                    })
+                )
+            ).sort((a, b) => a.order - b.order);
+            load.stop();
+            console.log(formattedPrs.map((pr) => pr.display).join('\n'));
         }
-        const anyCountOver9 = Object.values(counts).some((count) => count > 9);
+
+        const needPadding = Object.values(counts).some((count) => count > 9);
         console.log('');
-        console.log(
-            kleur.red(
-                `${icons.redEx()} ${
-                    counts.reviewerUnapproved < 10 && anyCountOver9
-                        ? ` ${counts.reviewerUnapproved}`
-                        : counts.reviewerUnapproved
-                } - Reviewer, Not Approved`
-            )
+        printTotalLine(
+            kleur.red,
+            icons.redEx(),
+            counts.reviewerUnapproved,
+            needPadding,
+            '- Reviewer, Not Approved'
         );
-        console.log(
-            kleur.green(
-                `${icons.greenCheck()} ${
-                    counts.reviewerApproved < 10 && anyCountOver9
-                        ? ` ${counts.reviewerApproved}`
-                        : counts.reviewerApproved
-                } - Reviewer, Approved`
-            )
+        printTotalLine(
+            kleur.green,
+            icons.greenCheck(),
+            counts.reviewerApproved,
+            needPadding,
+            '- Reviewer, Approved'
         );
-        console.log(
-            kleur.magenta(
-                `${icons.magentaQuestion()} ${
-                    counts.notReviewer < 10 && anyCountOver9
-                        ? ` ${counts.notReviewer}`
-                        : counts.notReviewer
-                } - Not Reviewer`
-            )
+        printTotalLine(
+            kleur.magenta,
+            icons.magentaQuestion(),
+            counts.notReviewer,
+            needPadding,
+            '- Not Reviewer'
         );
-        console.log(
-            kleur.blue(
-                `${icons.blueCircle()} ${
-                    counts.author < 10 && anyCountOver9
-                        ? ` ${counts.author}`
-                        : counts.author
-                } - Author`
-            )
+        printTotalLine(
+            kleur.blue,
+            icons.blueCircle(),
+            counts.author,
+            needPadding,
+            '- Author'
         );
-        console.log(
-            `  ${
-                counts.wip < 10 && anyCountOver9 ? ` ${counts.wip}` : counts.wip
-            } - Work In Progress`
+        printTotalLine(
+            kleur.gray,
+            ' ',
+            counts.wip,
+            needPadding,
+            '- Work In Progress'
         );
         console.log(
             kleur.yellow(
                 `${icons.yellowTri()} ${
-                    anyCountOver9 ? '  ' : ' '
+                    needPadding ? '  ' : ' '
                 } - Requested Changes`
             )
         );
@@ -522,20 +434,6 @@ const main = async () => {
         return;
     }
 };
-
-const sayGoodbye = () =>
-    console.log(
-        kleur.white().italic('\nGoodbye!'),
-        kleur.red('■'),
-        kleur.yellow('■'),
-        kleur.green('■'),
-        kleur.cyan('■'),
-        kleur.blue('■'),
-        kleur.magenta('■'),
-        kleur.white('■'),
-        kleur.grey('■'),
-        kleur.black('■')
-    );
 
 const saveCache = (cache: BetterPrCache) =>
     fs.writeFileSync(cacheFilePath, JSON.stringify(cache));
