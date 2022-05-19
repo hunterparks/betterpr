@@ -348,7 +348,7 @@ const main = async () => {
                         } else {
                             const participation = rawPr.participants?.find(
                                 (participant) =>
-                                    participant.user?.uuid !== user.uuid
+                                    participant.user?.uuid === user.uuid
                             ) as Schema.Participant;
                             if (!participation) {
                                 counts.notReviewer += 1;
@@ -410,7 +410,7 @@ const main = async () => {
             '- Author'
         );
         printTotalLine(
-            kleur.gray,
+            kleur.white,
             ' ',
             counts.wip,
             needPadding,
